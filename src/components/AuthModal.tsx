@@ -48,11 +48,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setError('Password must be at least 6 characters long.');
           return;
         }
+        setSuccessMessage('Creating your account... Please wait.');
         const created = await signupWithEmail(name.trim(), userId.trim(), company.trim(), password);
         if (!created) throw new Error('Account was not created. Check Supabase Email confirmation settings and try again.');
-        setSuccessMessage('Account created. You can now sign in using your User ID and password.');
+        setSuccessMessage('Account created successfully! You can now sign in using your User ID and password.');
       }
     } catch (err: any) {
+      setSuccessMessage(null);
       setError(err?.message || 'Authentication operation failed');
     } finally {
       setLoading(false);
