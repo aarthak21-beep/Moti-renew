@@ -197,7 +197,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               >
                 {t.auth.dontHaveAccount}
               </button>
-            ) : mode === 'signup' ? (
+            ) : (
               <button
                 type="button"
                 onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
