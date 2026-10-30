@@ -11,7 +11,7 @@ interface AuthContextType {
   loading: boolean;
   loginDemo: (name?: string, email?: string) => void;
   loginWithEmail: (email: string, password?: string) => Promise<boolean>;
-  signupWithEmail: (name: string, email: string, company?: string) => Promise<boolean>;
+  signupWithEmail: (name: string, email: string, company?: string, password?: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
