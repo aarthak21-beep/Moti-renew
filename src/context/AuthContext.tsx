@@ -144,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase.auth.signUp({
         email, password,
-        options: { data: { display_name: name, company_name: company || 'My Company' } },
+        options: { data: { display_name: name, company_name: company || 'My Company' }, emailRedirectTo: window.location.origin },
       });
       if (error) throw error;
       if (data.user && data.session) setUser(await profileForUser(data.user));
