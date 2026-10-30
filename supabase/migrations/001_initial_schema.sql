@@ -56,3 +56,9 @@ create policy "Users can manage their own payments" on public.payments
 drop policy if exists "Users can manage their own activities" on public.activities;
 create policy "Users can manage their own activities" on public.activities
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Allow authenticated clients to access the tables; RLS still limits rows to auth.uid().
+grant select, insert, update, delete on public.profiles to authenticated;
+grant select, insert, update, delete on public.subscriptions to authenticated;
+grant select, insert, update, delete on public.payments to authenticated;
+grant select, insert, update, delete on public.activities to authenticated;
