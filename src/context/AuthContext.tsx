@@ -6,22 +6,23 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   loginDemo: (name?: string, email?: string) => void;
-  loginWithEmail: (email: string, password?: string) => Promise<boolean>;
-  signupWithEmail: (name: string, email: string, company?: string, password?: string) => Promise<boolean>;
+  loginWithEmail: (userId: string, password?: string) => Promise<boolean>;
+  signupWithEmail: (name: string, userId: string, company?: string, password?: string) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
-  resetPassword: (email: string) => Promise<boolean>;
   isSupabaseConnected: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const authEmailForId = (userId: string) => `${userId.trim().toLowerCase()}@motirenew.invalid`;
+
 async function profileForUser(authUser: any): Promise<UserProfile> {
   const fallback: UserProfile = {
     uid: authUser.id,
-    email: authUser.email || '',
-    displayName: authUser.user_metadata?.display_name || authUser.email?.split('@')[0] || 'Subscriber',
+    email: authUser.user_metadata?.username || authUser.email || '',
+    displayName: authUser.user_metadata?.display_name || authUser.user_metadata?.username || 'Subscriber',
     companyName: authUser.user_metadata?.company_name || 'My Business',
     defaultCurrency: 'INR',
     language: 'en',
@@ -108,26 +109,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Demo sign-in is disabled; users must authenticate with Supabase.
   };
 
-  const loginWithEmail = async (email: string, password = ''): Promise<boolean> => {
+  const loginWithEmail = async (userId: string, password = ''): Promise<boolean> => {
     if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
     if (!password) throw new Error('Please enter your password.');
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const normalizedId = userId.trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,30}$/.test(normalizedId)) throw new Error('User ID must be 3–30 characters (letters, numbers, dot, underscore or hyphen).');
+      const { data, error } = await supabase.auth.signInWithPassword({ email: authEmailForId(normalizedId), password });
       if (error) throw error;
       if (data.user) setUser(await profileForUser(data.user));
       return Boolean(data.user);
     } finally { setLoading(false); }
   };
 
-  const signupWithEmail = async (name: string, email: string, company = '', password = ''): Promise<boolean> => {
+  const signupWithEmail = async (name: string, userId: string, company = '', password = ''): Promise<boolean> => {
     if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
     if (!password) throw new Error('Please enter a password.');
     setLoading(true);
     try {
+      const normalizedId = userId.trim().toLowerCase();
+      if (!/^[a-z0-9._-]{3,30}$/.test(normalizedId)) throw new Error('User ID must be 3–30 characters (letters, numbers, dot, underscore or hyphen).');
       const { data, error } = await supabase.auth.signUp({
-        email, password,
-        options: { data: { display_name: name, company_name: company || 'My Company' }, emailRedirectTo: window.location.origin },
+        email: authEmailForId(normalizedId), password,
+        options: { data: { username: normalizedId, display_name: name, company_name: company || 'My Company' } },
       });
       if (error) throw error;
       if (data.user && data.session) setUser(await profileForUser(data.user));
@@ -171,19 +176,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(updated);
   };
 
-  const resetPassword = async (email: string): Promise<boolean> => {
-    if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
-    if (error) throw error;
-    return true;
-  };
-
   return (
     <AuthContext.Provider value={{
       user, loading, loginDemo, loginWithEmail, signupWithEmail,
-      loginWithGoogle, logout, updateProfile, resetPassword,
+      loginWithGoogle, logout, updateProfile,
       isSupabaseConnected: Boolean(supabase),
     }}>
       {children}
