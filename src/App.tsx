@@ -17,7 +17,14 @@ import { AuthModal } from './components/AuthModal';
 import { Subscription, PaymentRecord } from './types';
 
 function MainApp() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">Loading...</div>;
+  }
+  if (!user) {
+    return <AuthModal isOpen={true} onClose={() => {}} />;
+  }
   const { 
     subscriptions, 
     addSubscription, 
