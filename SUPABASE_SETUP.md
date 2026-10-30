@@ -9,7 +9,11 @@ The Firebase client has been replaced with Supabase Auth and database access.
 3. Copy and run the complete contents of `supabase/migrations/001_initial_schema.sql`.
 4. Confirm the query succeeds. The migration creates `profiles`, `subscriptions`, `payments`, and `activities`, with Row Level Security policies that restrict each signed-in user to their own records.
 
-## 2. Configure authentication
+## 2. Expose the tables to the Data API
+
+Because automatic exposure of new tables is disabled in this project, open **Project Settings → API → Data API** and make sure the `profiles`, `subscriptions`, `payments`, and `activities` tables in the `public` schema are exposed to the Data API. Keep Row Level Security enabled; the migration creates per-user policies.
+
+## 3. Configure authentication
 
 In Supabase, open **Authentication → URL Configuration** and add the deployed Render URL to the allowed redirect URLs:
 `https://moti-renew.onrender.com/**`
@@ -18,7 +22,7 @@ Email/password sign-in is supported. If email confirmation is enabled, new users
 
 Google sign-in is optional. To enable it, configure the Google provider under **Authentication → Providers → Google** with your Google OAuth client ID and secret, and add the Supabase callback URL shown on that page to the Google OAuth client.
 
-## 3. Add Render environment variables
+## 4. Add Render environment variables
 
 In Render, open the Moti Renew Static Site → **Environment** and add:
 
