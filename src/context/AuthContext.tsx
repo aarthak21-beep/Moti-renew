@@ -1,9 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { UserProfile, Currency } from '../types';
-import { auth, db } from '../lib/firebase';
-import { onAuthStateChanged, signOut as fbSignOut } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { handleFirestoreError, OperationType } from '../lib/error-handler';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { UserProfile } from '../types';
+import { supabase } from '../lib/supabase';
 import { Language } from '../i18n/translations';
 
 interface AuthContextType {
@@ -16,7 +13,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   resetPassword: (email: string) => Promise<boolean>;
-  isFirebaseConnected: boolean;
+  isSupabaseConnected: boolean;
 }
 
 const DEFAULT_DEMO_USER: UserProfile = {
@@ -32,164 +29,143 @@ const DEFAULT_DEMO_USER: UserProfile = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+async function profileForUser(authUser: any): Promise<UserProfile> {
+  const fallback: UserProfile = {
+    uid: authUser.id,
+    email: authUser.email || '',
+    displayName: authUser.user_metadata?.display_name || authUser.email?.split('@')[0] || 'Subscriber',
+    companyName: authUser.user_metadata?.company_name || 'My Business',
+    defaultCurrency: 'INR',
+    language: 'en',
+    theme: 'light',
+    createdAt: authUser.created_at || new Date().toISOString(),
+  };
+  if (!supabase) return fallback;
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+  if (error) throw error;
+  if (data) {
+    return {
+      uid: data.id,
+      email: data.email || fallback.email,
+      displayName: data.display_name || fallback.displayName,
+      companyName: data.company_name || fallback.companyName,
+      defaultCurrency: data.default_currency || 'INR',
+      language: data.language || 'en',
+      theme: data.theme || 'light',
+      createdAt: data.created_at || fallback.createdAt,
+    };
+  }
+  const { error: saveError } = await supabase.from('profiles').upsert({
+    id: authUser.id, email: fallback.email, display_name: fallback.displayName,
+    company_name: fallback.companyName, default_currency: fallback.defaultCurrency,
+    language: fallback.language, theme: fallback.theme,
+  });
+  if (saveError) throw saveError;
+  return fallback;
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('moti_renew_user');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return DEFAULT_DEMO_USER;
-      }
-    }
-    return DEFAULT_DEMO_USER; // Default to demo user so the app is immediately live and interactive
+    try {
+      const saved = localStorage.getItem('moti_renew_user');
+      if (saved) return JSON.parse(saved) as UserProfile;
+    } catch { /* Ignore invalid cached profile. */ }
+    return supabase ? null : DEFAULT_DEMO_USER;
   });
-  const [loading, setLoading] = useState(false);
-  const [isFirebaseConnected, setIsFirebaseConnected] = useState(false);
+  const [loading, setLoading] = useState(Boolean(supabase));
 
-  // Sync user changes to localStorage
   useEffect(() => {
     if (user) {
       localStorage.setItem('moti_renew_user', JSON.stringify(user));
-      // Apply theme
-      if (user.theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+      document.documentElement.classList.toggle('dark', user.theme === 'dark');
+    } else {
+      localStorage.removeItem('moti_renew_user');
     }
   }, [user]);
 
-  // Listen to Firebase auth if available
   useEffect(() => {
-    if (!auth) {
-      setIsFirebaseConnected(false);
-      return;
-    }
-
-    setIsFirebaseConnected(true);
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (fbUser) {
-        // Fetch or create profile from Firestore
-        if (db) {
-          try {
-            const userDocRef = doc(db, 'users', fbUser.uid);
-            const userSnap = await getDoc(userDocRef);
-            if (userSnap.exists()) {
-              const data = userSnap.data() as UserProfile;
-              setUser(data);
-            } else {
-              const newProfile: UserProfile = {
-                uid: fbUser.uid,
-                email: fbUser.email || '',
-                displayName: fbUser.displayName || 'Subscriber',
-                companyName: 'My Business',
-                defaultCurrency: 'INR',
-                language: 'en',
-                theme: 'light',
-                createdAt: new Date().toISOString(),
-              };
-              await setDoc(userDocRef, newProfile);
-              setUser(newProfile);
-            }
-          } catch (err) {
-            handleFirestoreError(err, OperationType.GET, `users/${fbUser.uid}`, auth?.currentUser);
-          }
-        } else {
-          setUser({
-            uid: fbUser.uid,
-            email: fbUser.email || '',
-            displayName: fbUser.displayName || 'User',
-            defaultCurrency: 'INR',
-            language: 'en',
-            theme: 'light',
-            createdAt: new Date().toISOString(),
-          });
+    if (!supabase) { setLoading(false); return; }
+    let active = true;
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (error) console.error('Supabase session error:', error.message);
+      if (data.session?.user) {
+        try {
+          const profile = await profileForUser(data.session.user);
+          if (active) setUser(profile);
+        } catch (profileError) {
+          console.error('Could not load profile:', profileError);
         }
+      } else if (active) {
+        setUser(null);
       }
+      if (active) setLoading(false);
     });
-
-    return () => unsubscribe();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return;
+      if (!session?.user) {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+      // Defer profile queries until after the auth callback returns.
+      window.setTimeout(async () => {
+        try {
+          const profile = await profileForUser(session.user);
+          if (active) setUser(profile);
+        } catch (profileError) {
+          console.error('Could not load profile:', profileError);
+        } finally {
+          if (active) setLoading(false);
+        }
+      }, 0);
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
-  const loginDemo = (name: string = 'Aarthak Sharma', email: string = 'aarthak21@gmail.com') => {
-    const demoUser: UserProfile = {
-      ...DEFAULT_DEMO_USER,
-      displayName: name,
-      email: email,
-    };
-    setUser(demoUser);
+  const loginDemo = (name = 'Aarthak Sharma', email = 'aarthak21@gmail.com') => {
+    setUser({ ...DEFAULT_DEMO_USER, displayName: name, email });
   };
 
-  const loginWithEmail = async (email: string): Promise<boolean> => {
+  const loginWithEmail = async (email: string, password = ''): Promise<boolean> => {
+    if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
+    if (!password) throw new Error('Please enter your password.');
     setLoading(true);
     try {
-      // Simulate/Authenticate
-      await new Promise((r) => setTimeout(r, 600));
-      const existingUserStr = localStorage.getItem('moti_renew_user');
-      let baseUser = DEFAULT_DEMO_USER;
-      if (existingUserStr) {
-        try {
-          baseUser = JSON.parse(existingUserStr);
-        } catch (_) {}
-      }
-      const loggedIn: UserProfile = {
-        ...baseUser,
-        email,
-        displayName: email.split('@')[0],
-      };
-      setUser(loggedIn);
-      return true;
-    } finally {
-      setLoading(false);
-    }
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      if (data.user) setUser(await profileForUser(data.user));
+      return Boolean(data.user);
+    } finally { setLoading(false); }
   };
 
-  const signupWithEmail = async (name: string, email: string, company?: string): Promise<boolean> => {
+  const signupWithEmail = async (name: string, email: string, company = '', password = ''): Promise<boolean> => {
+    if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
+    if (!password) throw new Error('Please enter a password.');
     setLoading(true);
     try {
-      await new Promise((r) => setTimeout(r, 600));
-      const newUser: UserProfile = {
-        uid: 'usr_' + Date.now().toString(36),
-        email,
-        displayName: name,
-        companyName: company || 'My Company',
-        defaultCurrency: 'INR',
-        language: 'en',
-        theme: 'light',
-        createdAt: new Date().toISOString(),
-      };
-      setUser(newUser);
-      return true;
-    } finally {
-      setLoading(false);
-    }
+      const { data, error } = await supabase.auth.signUp({
+        email, password,
+        options: { data: { display_name: name, company_name: company || 'My Company' } },
+      });
+      if (error) throw error;
+      if (data.user && data.session) setUser(await profileForUser(data.user));
+      return Boolean(data.user);
+    } finally { setLoading(false); }
   };
 
   const loginWithGoogle = async (): Promise<boolean> => {
-    setLoading(true);
-    try {
-      const { signInWithGoogle } = await import('../lib/firebase');
-      const fbUser = await signInWithGoogle();
-      if (fbUser) {
-        return true;
-      }
-      return false;
-    } catch (err) {
-      console.error('Google sign in error:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google', options: { redirectTo: window.location.origin },
+    });
+    if (error) throw error;
+    return true;
   };
 
   const logout = async () => {
-    if (auth) {
-      try {
-        await fbSignOut(auth);
-      } catch (e) {
-        console.error(e);
-      }
+    if (supabase) {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     }
     setUser(null);
     localStorage.removeItem('moti_renew_user');
@@ -198,38 +174,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user) return;
     const updated = { ...user, ...updates };
-    setUser(updated);
-
-    if (db && auth?.currentUser) {
-      try {
-        const userDocRef = doc(db, 'users', user.uid);
-        await setDoc(userDocRef, updated, { merge: true });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}`, auth.currentUser);
-      }
+    if (supabase && !user.uid.startsWith('usr_')) {
+      const { error } = await supabase.from('profiles').upsert({
+        id: user.uid, email: updated.email, display_name: updated.displayName,
+        company_name: updated.companyName, default_currency: updated.defaultCurrency,
+        language: updated.language, theme: updated.theme,
+      });
+      if (error) throw error;
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { display_name: updated.displayName, company_name: updated.companyName },
+      });
+      if (authError) throw authError;
     }
+    setUser(updated);
   };
 
-  const resetPassword = async (_email: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 700));
+  const resetPassword = async (email: string): Promise<boolean> => {
+    if (!supabase) throw new Error('Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) throw error;
     return true;
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        loginDemo,
-        loginWithEmail,
-        signupWithEmail,
-        loginWithGoogle,
-        logout,
-        updateProfile,
-        resetPassword,
-        isFirebaseConnected,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user, loading, loginDemo, loginWithEmail, signupWithEmail,
+      loginWithGoogle, logout, updateProfile, resetPassword,
+      isSupabaseConnected: Boolean(supabase),
+    }}>
       {children}
     </AuthContext.Provider>
   );
@@ -237,8 +211,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };
