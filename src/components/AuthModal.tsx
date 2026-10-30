@@ -36,7 +36,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setError('Please provide User ID and password');
           return;
         }
-        await loginWithEmail(userId.trim(), password);
+        const signedIn = await loginWithEmail(userId.trim(), password);
+        if (!signedIn) throw new Error('Sign in did not complete. Check the User ID and password, then try again.');
         onClose();
       } else if (mode === 'signup') {
         if (!name.trim() || !userId.trim() || !password) {
@@ -47,7 +48,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setError('Password must be at least 6 characters long.');
           return;
         }
-        await signupWithEmail(name.trim(), userId.trim(), company.trim(), password);
+        const created = await signupWithEmail(name.trim(), userId.trim(), company.trim(), password);
+        if (!created) throw new Error('Account was not created. Check Supabase Email confirmation settings and try again.');
         setSuccessMessage('Account created. You can now sign in using your User ID and password.');
       }
     } catch (err: any) {
