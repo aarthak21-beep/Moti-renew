@@ -9,7 +9,7 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { user, loginWithEmail, signupWithEmail, loginWithGoogle, loginDemo, resetPassword } = useAuth();
+  const { user, loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword } = useAuth();
   const lang: Language = user?.language || 'en';
   const t = translations[lang] || translations.en;
 
@@ -98,12 +98,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               </p>
             </div>
           </div>
-          <button
+          {user && <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
           >
             <X className="w-4 h-4" />
-          </button>
+          </button>}
         </div>
 
         {/* Form Body */}
@@ -237,29 +237,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </svg>
             <span>Sign in with Google</span>
           </button>
-
-          {/* Guest Demo Mode Switcher */}
-          <div className="pt-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 space-y-1.5">
-            <div className="font-semibold text-slate-700 dark:text-slate-300">
-              Quick Test Accounts:
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleSwitchToDemo('Aarthak Sharma', 'aarthak21@gmail.com')}
-                className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:text-blue-600"
-              >
-                Aarthak (Admin)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchToDemo('Rohit Verma', 'rohit@motitech.in')}
-                className="px-2 py-0.5 rounded bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-200 hover:text-blue-600"
-              >
-                Rohit (Ops)
-              </button>
-            </div>
-          </div>
 
           {/* Toggle between modes */}
           <div className="pt-2 text-center text-xs text-slate-500 dark:text-slate-400">
