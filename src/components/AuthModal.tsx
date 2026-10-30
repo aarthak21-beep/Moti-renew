@@ -61,7 +61,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setError('Please fill all required fields');
           return;
         }
-        await signupWithEmail(name.trim(), email.trim(), company.trim());
+        await signupWithEmail(name.trim(), email.trim(), company.trim(), password);
         setSuccessMessage(t.auth.accountCreated);
         setTimeout(() => onClose(), 1200);
       } else if (mode === 'forgot') {
