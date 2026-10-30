@@ -1,0 +1,6 @@
+{
+  "name": "Moti Renew",
+  "description": "Subscription and renewal management platform by Moti Technologies. Never miss a renewal again.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
