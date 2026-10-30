@@ -135,8 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: { data: { username: normalizedId, display_name: name, company_name: company || 'My Company' } },
       });
       if (error) throw error;
+      if (data.user && !data.session) throw new Error('Email confirmation is still enabled in Supabase. Turn OFF Authentication → Providers → Email → Confirm email, then create the account again.');
       if (data.user && data.session) setUser(await profileForUser(data.user));
-      return Boolean(data.user);
+      return Boolean(data.user && data.session);
     } finally { setLoading(false); }
   };
 
