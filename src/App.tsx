@@ -18,13 +18,6 @@ import { Subscription, PaymentRecord } from './types';
 
 function MainApp() {
   const { user, loading: authLoading } = useAuth();
-
-  if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">Loading...</div>;
-  }
-  if (!user) {
-    return <AuthModal isOpen={true} onClose={() => {}} />;
-  }
   const { 
     subscriptions, 
     addSubscription, 
@@ -50,6 +43,13 @@ function MainApp() {
 
   const [preselectedSubIdForWhatsApp, setPreselectedSubIdForWhatsApp] = useState<string | undefined>(undefined);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  if (authLoading) {
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600">Loading...</div>;
+  }
+  if (!user) {
+    return <AuthModal isOpen={true} onClose={() => {}} />;
+  }
 
   // Open Payment Modal
   const handleOpenRecordPayment = (subId?: string) => {
