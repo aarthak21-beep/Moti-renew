@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, Mail, User, Building2, Key, CheckCircle, AlertCircle, ArrowLeft } from 'lucide-react';
+import { X, Lock, User, Building2, Key, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { translations, Language } from '../i18n/translations';
 
@@ -9,12 +9,12 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { user, loginWithEmail, signupWithEmail, resetPassword } = useAuth();
+  const { user, loginWithEmail, signupWithEmail } = useAuth();
   const lang: Language = user?.language || 'en';
   const t = translations[lang] || translations.en;
 
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
-  const [email, setEmail] = useState('');
+  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
@@ -32,14 +32,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (mode === 'signin') {
-        if (!email.trim() || !password) {
-          setError('Please provide email and password');
+        if (!userId.trim() || !password) {
+          setError('Please provide User ID and password');
           return;
         }
-        await loginWithEmail(email.trim(), password);
+        await loginWithEmail(userId.trim(), password);
         onClose();
       } else if (mode === 'signup') {
-        if (!name.trim() || !email.trim() || !password) {
+        if (!name.trim() || !userId.trim() || !password) {
           setError('Please fill all required fields');
           return;
         }
@@ -47,15 +47,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           setError('Password must be at least 6 characters long.');
           return;
         }
-        await signupWithEmail(name.trim(), email.trim(), company.trim(), password);
-        setSuccessMessage('Account request submitted. Check your Gmail inbox (and Spam) for the confirmation link. If confirmation is disabled, you can sign in now.');
-      } else if (mode === 'forgot') {
-        if (!email.trim()) {
-          setError('Please enter your registered email address');
-          return;
-        }
-        await resetPassword(email.trim());
-        setSuccessMessage(t.auth.resetSent);
+        await signupWithEmail(name.trim(), userId.trim(), company.trim(), password);
+        setSuccessMessage('Account created. You can now sign in using your User ID and password.');
       }
     } catch (err: any) {
       setError(err?.message || 'Authentication operation failed');
@@ -143,35 +136,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-slate-400" />
-              {t.auth.email} *
+              <Key className="w-3.5 h-3.5 text-slate-400" />
+              User ID *
             </label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@company.com"
+              minLength={3}
+              maxLength={30}
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              placeholder="e.g. moti_admin"
+              autoCapitalize="none"
+              autoCorrect="off"
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
             />
-          </div>
+          </div>>
 
-          {mode !== 'forgot' && (
+          {true && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-slate-400" />
                   {t.auth.password} *
                 </label>
-                {mode === 'signin' && (
-                  <button
-                    type="button"
-                    onClick={() => { setMode('forgot'); setError(null); setSuccessMessage(null); }}
-                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {t.auth.forgotPassword}
-                  </button>
-                )}
+      
               </div>
               <input
                 type="password"
@@ -195,7 +184,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
               ? t.auth.signIn 
               : mode === 'signup' 
               ? t.auth.signUp 
-              : t.auth.sendResetLink}
+              : t.auth.signIn}
           </button>
 
           {/* Toggle between modes */}
@@ -215,15 +204,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 className="text-blue-600 dark:text-blue-400 font-semibold hover:underline"
               >
                 {t.auth.alreadyHaveAccount}
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => { setMode('signin'); setError(null); setSuccessMessage(null); }}
-                className="text-blue-600 dark:text-blue-400 font-semibold hover:underline inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="w-3 h-3" />
-                {t.auth.backToLogin}
               </button>
             )}
           </div>
