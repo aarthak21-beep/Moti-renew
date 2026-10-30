@@ -15,17 +15,6 @@ interface AuthContextType {
   isSupabaseConnected: boolean;
 }
 
-const DEFAULT_DEMO_USER: UserProfile = {
-  uid: 'usr_moti_demo_01',
-  email: 'aarthak21@gmail.com',
-  displayName: 'Aarthak Sharma',
-  companyName: 'Moti Technologies',
-  defaultCurrency: 'INR',
-  language: 'en',
-  theme: 'light',
-  createdAt: '2026-01-15T10:00:00Z',
-};
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 async function profileForUser(authUser: any): Promise<UserProfile> {
@@ -64,13 +53,7 @@ async function profileForUser(authUser: any): Promise<UserProfile> {
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    try {
-      const saved = localStorage.getItem('moti_renew_user');
-      if (saved) return JSON.parse(saved) as UserProfile;
-    } catch { /* Ignore invalid cached profile. */ }
-    return supabase ? null : DEFAULT_DEMO_USER;
-  });
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(Boolean(supabase));
 
   useEffect(() => {
@@ -121,8 +104,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, []);
 
-  const loginDemo = (name = 'Aarthak Sharma', email = 'aarthak21@gmail.com') => {
-    setUser({ ...DEFAULT_DEMO_USER, displayName: name, email });
+  const loginDemo = (_name?: string, _email?: string) => {
+    // Demo sign-in is disabled; users must authenticate with Supabase.
   };
 
   const loginWithEmail = async (email: string, password = ''): Promise<boolean> => {
